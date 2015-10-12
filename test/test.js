@@ -4,9 +4,32 @@ var B = require('bluebird');
 var fs = require('fs');
 var split = require('split');
 var path = require('path');
+var inherits = require('util').inherits;
+var Readable = require('stream').Readable;
 
 var t = require('blue-tape');
 
+function Counter() {
+  Readable.call(this, { objectMode: true });
+  this._max = 200;
+  this._index = 1;
+}
+inherits(Counter, Readable);
+
+Counter.prototype._read = function() {
+  var i = this._index++;
+  if (i > this._max) {
+    this.push(null);
+  } else {
+    console.log('reading', i);
+    this.push(i);
+  }
+};
+
+function double(input) {
+  console.log('doubling', input);
+  return B.resolve(input * 2);
+}
 
 function lines() {
     return raw().pipe(split())
@@ -22,7 +45,6 @@ function delayer() {
         }));
     });
 }
-
 
 t.test('ps.wait', function(t) {
     var last = 0;
@@ -48,6 +70,13 @@ t.test('map-wait', function(t) {
     });
 });
 
+t.test('map-wait 2', function(t) {
+    var counter = new Counter();
+    return ps.wait(counter.pipe(ps.map(double))).then(function(value) {
+      console.log(value);
+      t.equal(0, 0, 'just a test');
+    });
+});
 
 t.test('combined', function(t) {
     return lines().pipe(delayer())
